@@ -1,5 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { MessageCircle, X, Send } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import remarkBreaks from 'remark-breaks';
 
 interface Message {
   id: string;
@@ -61,9 +64,16 @@ export default function ChatbotPopup() {
 
         if (response.ok) {
           const data = await response.json();
+          let botText = data.response ?? data.message ?? 'Gracias por tu mensaje.';
+
+          // Si viene como string con comillas (doble stringify), intenta parsear
+          if (typeof botText === 'string') {
+            try { botText = JSON.parse(botText); } catch {}
+            botText = botText.replace(/\\r\\n/g, '\n').replace(/\\n/g, '\n');
+          }
           const botMessage: Message = {
             id: (Date.now() + 1).toString(),
-            text: data.response || data.message || 'Gracias por tu mensaje.',
+            text: botText,
             sender: 'bot',
             timestamp: new Date(),
           };
@@ -142,7 +152,20 @@ export default function ChatbotPopup() {
                       : 'bg-white text-gray-800 rounded-bl-none shadow-sm'
                   }`}
                 >
-                  <p className="text-sm">{message.text}</p>
+                  <div className="text-sm break-words">
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm, remarkBreaks]}
+                        components={{
+                          p: ({ node, ...props }) => <p className="mb-2 last:mb-0" {...props} />,
+                          strong: ({ node, ...props }) => <strong className="font-semibold" {...props} />,
+                          ul: ({ node, ...props }) => <ul className="list-disc pl-5 mb-2" {...props} />,
+                          ol: ({ node, ...props }) => <ol className="list-decimal pl-5 mb-2" {...props} />,
+                          li: ({ node, ...props }) => <li className="mb-1" {...props} />,
+                        }}
+                      >
+                        {message.text}
+                      </ReactMarkdown>
+                    </div>
                   <p
                     className={`text-xs mt-1 ${
                       message.sender === 'user' ? 'text-blue-100' : 'text-gray-500'
